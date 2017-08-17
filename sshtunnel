@@ -1,0 +1,80 @@
+#!/bin/bash
+
+config=/etc/sshtunnel.conf
+socket=/tmp/ssh_tunnel_sck
+
+[ ! -f $config ] && echo "No config file found in $config"
+
+. $config
+
+sshcmd() {
+/usr/bin/ssh \
+-o "ControlPath=$socket" \
+-o "ControlMaster=auto" \
+-o "ControlPersist=5m" \
+-o "ServerAliveInterval=10" \
+-o "ServerAliveCountMax=12" \
+$1 \
+"$REMOTE_HOST" \
+"$2"
+}
+
+local_cmd() {
+	$1
+	log "  local: $1"
+}
+
+remote_cmd() {
+	sshcmd "--" "$1"
+	log " remote: $1"
+}
+
+log() {
+	echo "$1"
+}
+
+
+start() {
+	sshcmd "-w $LOCAL_TUN:$REMOTE_TUN -T" exit > /dev/null
+
+	log "Running ssh tunnel session $socket."
+
+	sleep 1
+
+	local_cmd "ifconfig tun$LOCAL_TUN $LOCAL_IP pointopoint $REMOTE_IP netmask $NETMASK"
+	remote_cmd "ifconfig tun$REMOTE_TUN $REMOTE_IP pointopoint $LOCAL_IP netmask $NETMASK"
+
+	for r in $LOCAL_ROUTES; do
+		local_cmd "ip route add $r dev tun$LOCAL_TUN"
+ 	done
+}
+
+stop() {
+	ssh -O exit -S $socket $REMOTE_HOST
+}
+
+status() {
+	ssh -O check -S $socket $REMOTE_HOST
+	if [ $? -eq 0 ]; then
+		ping -c 1 $REMOTE_IP > /dev/null
+	fi
+}
+
+case $1 in
+	start)
+		start
+		;;
+	stop)
+		stop
+		;;
+	status)
+		status
+		;;
+	restart)
+		stop
+		start
+		;;
+	*)
+		echo "$0 [start|stop|restart|status]"
+		;;
+esac
