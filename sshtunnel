@@ -39,7 +39,23 @@ start() {
 
 	log "Running ssh tunnel session $socket."
 
-	sleep 1
+	while true; do
+		ip link show tun${LOCAL_TUN} > /dev/null
+		if [ $? -eq 0 ]; then
+			break
+		fi
+		echo "Waiting for local adapter tun${LOCAL_TUN}"
+		sleep 1
+	done
+
+	while true; do
+		sshcmd " " "ip link show tun${REMOTE_TUN}" > /dev/null
+		if [ $? -eq 0 ]; then
+			break
+		fi
+		echo "Waiting for remote adapter tun${REMOTE_TUN}"
+		sleep 1
+	done
 
 	local_cmd "ifconfig tun$LOCAL_TUN $LOCAL_IP pointopoint $REMOTE_IP netmask $NETMASK"
 	remote_cmd "ifconfig tun$REMOTE_TUN $REMOTE_IP pointopoint $LOCAL_IP netmask $NETMASK"
