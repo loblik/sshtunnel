@@ -14,6 +14,8 @@ sshcmd() {
 -o "ControlPersist=5m" \
 -o "ServerAliveInterval=10" \
 -o "ServerAliveCountMax=12" \
+-o "IdentitiesOnly=yes" \
+-i "$IDENTITY_FILE" \
 $1 \
 "$REMOTE_HOST" \
 "$2"
