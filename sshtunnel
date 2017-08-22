@@ -22,17 +22,17 @@ $1 \
 }
 
 local_cmd() {
-	$1
-	log "  local: $1"
+    $1
+    log "  local: $1"
 }
 
 remote_cmd() {
-	sshcmd "--" "$1"
-	log " remote: $1"
+    sshcmd "--" "$1"
+    log " remote: $1"
 }
 
 log() {
-	echo "$1"
+    echo "$1"
 }
 
 socketStatus() {
@@ -40,34 +40,40 @@ socketStatus() {
 }
 
 start() {
-	sshcmd "-w $LOCAL_TUN:$REMOTE_TUN -T" exit > /dev/null
+    if socketStatus; then
+        echo "Seems already running"
+        return 0
+    fi
 
-	log "Running ssh tunnel session $socket."
+    sshcmd "-w $LOCAL_TUN:$REMOTE_TUN -T" exit > /dev/null
+    [ $? -ne 0 ] && echo "Something is wrong" && exit 2
 
-	while true; do
-		ip link show tun${LOCAL_TUN} > /dev/null
-		if [ $? -eq 0 ]; then
-			break
-		fi
-		echo "Waiting for local adapter tun${LOCAL_TUN}"
-		sleep 1
-	done
+    log "Running ssh tunnel session $socket."
 
-	while true; do
-		sshcmd " " "ip link show tun${REMOTE_TUN}" > /dev/null
-		if [ $? -eq 0 ]; then
-			break
-		fi
-		echo "Waiting for remote adapter tun${REMOTE_TUN}"
-		sleep 1
-	done
+    while true; do
+        ip link show tun${LOCAL_TUN} > /dev/null
+        if [ $? -eq 0 ]; then
+            break
+        fi
+        echo "Waiting for local adapter tun${LOCAL_TUN}"
+        sleep 1
+    done
 
-	local_cmd "ifconfig tun$LOCAL_TUN $LOCAL_IP pointopoint $REMOTE_IP netmask $NETMASK"
-	remote_cmd "ifconfig tun$REMOTE_TUN $REMOTE_IP pointopoint $LOCAL_IP netmask $NETMASK"
+    while true; do
+        sshcmd " " "ip link show tun${REMOTE_TUN}" > /dev/null
+        if [ $? -eq 0 ]; then
+            break
+        fi
+        echo "Waiting for remote adapter tun${REMOTE_TUN}"
+        sleep 1
+    done
 
-	for r in $LOCAL_ROUTES; do
-		local_cmd "ip route add $r dev tun$LOCAL_TUN"
- 	done
+    local_cmd "ifconfig tun$LOCAL_TUN $LOCAL_IP pointopoint $REMOTE_IP netmask $NETMASK"
+    remote_cmd "ifconfig tun$REMOTE_TUN $REMOTE_IP pointopoint $LOCAL_IP netmask $NETMASK"
+
+    for r in $LOCAL_ROUTES; do
+        local_cmd "ip route add $r dev tun$LOCAL_TUN"
+    done
 }
 
 stop() {
@@ -88,20 +94,20 @@ status() {
 }
 
 case $1 in
-	start)
-		start
-		;;
-	stop)
-		stop
-		;;
-	status)
-		status
-		;;
-	restart)
-		stop
-		start
-		;;
-	*)
-		echo "$0 [start|stop|restart|status]"
-		;;
+    start)
+        start
+        ;;
+    stop)
+        stop
+        ;;
+    status)
+        status
+        ;;
+    restart)
+        stop
+        start
+        ;;
+    *)
+        echo "$0 [start|stop|restart|status]"
+        ;;
 esac
