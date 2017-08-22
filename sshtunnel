@@ -35,6 +35,9 @@ log() {
 	echo "$1"
 }
 
+socketStatus() {
+    ssh -O check -S $socket $REMOTE_HOST 2> /dev/null
+}
 
 start() {
 	sshcmd "-w $LOCAL_TUN:$REMOTE_TUN -T" exit > /dev/null
@@ -68,14 +71,20 @@ start() {
 }
 
 stop() {
-	ssh -O exit -S $socket $REMOTE_HOST
+    if socketStatus; then
+        ssh -O exit -S $socket $REMOTE_HOST
+    else
+        echo "Should be stopped already"
+    fi
 }
 
 status() {
-	ssh -O check -S $socket $REMOTE_HOST
-	if [ $? -eq 0 ]; then
-		ping -c 1 $REMOTE_IP > /dev/null
-	fi
+    socketStatus
+    if [ $? -ne 0 ]; then
+        echo "Not running"
+    else
+        echo "Tunnel is running"
+    fi
 }
 
 case $1 in
